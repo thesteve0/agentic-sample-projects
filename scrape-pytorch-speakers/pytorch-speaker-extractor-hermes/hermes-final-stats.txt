@@ -1,0 +1,8 @@
+Resume this session with:
+  hermes --resume 20260721_112536_c6bd5c
+  hermes -c "Creating A Uv Managed Python Venv"
+
+Session:        20260721_112536_c6bd5c
+Title:          Creating A Uv Managed Python Venv
+Duration:       3h 55m 26s
+Messages:       127 (5 user, 116 tool calls)
