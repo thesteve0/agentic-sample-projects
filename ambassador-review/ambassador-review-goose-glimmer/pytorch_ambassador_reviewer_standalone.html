@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PyTorch Ambassador Reviewer</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#f6f7fb;color:#111}
+header{background:#1f2937;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:16px}
+header h1{margin:0;font-size:18px}
+main{padding:20px;max-width:1400px;margin:auto}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+label{font-weight:600;font-size:13px}
+input[type=file]{margin:8px 0}
+button{padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}
+button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+nav{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+select{padding:6px}
+.evidence{max-height:600px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fafafa}
+.evidence dl{margin:0;display:grid;grid-template-columns:180px 1fr;gap:8px 12px}
+.evidence dt{font-weight:600}
+.evidence dd{margin:0;word-break:break-word}
+a{color:#2563eb;word-break:break-all}
+.score-q{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px}
+.score-q h3{margin:0 0 8px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+.rubric{font-size:12px;color:#555}
+.radios{display:flex;gap:8px}
+.radios label{display:flex;align-items:center;gap:4px;font-weight:400;font-size:13px}
+.total{font-size:20px;font-weight:700;margin:12px 0}
+.recommend{padding:8px 12px;border-radius:8px;display:inline-block;font-weight:600}
+.recommend.strong{background:#dcfce7;color:#166534}
+.recommend.rec{background:#dbeafe;color:#1e40af}
+.recommend.border{background:#fef3c7;color:#92400e}
+.recommend.none{background:#f3f4f6;color:#374151}
+textarea{width:100%;min-height:120px;padding:8px;border-radius:8px;border:1px solid #ccc}
+footer{margin-top:20px;font-size:12px;color:#666}
+</style>
+</head>
+<body>
+<header><h1>PyTorch Foundation Ambassador Reviewer 2026</h1></header>
+<main>
+<div class="card">
+<label>Load Workbook</label>
+<input id="file" type="file" accept=".xlsx,.xls,.ods">
+<div id="status"></div>
+</div>
+<div id="app" style="display:none">
+<nav>
+<button id="prev">Previous</button>
+<button id="next">Next</button>
+<select id="index"></select>
+<span id="progress"></span>
+<button id="export" class="primary">Export CSV</button>
+</nav>
+<div class="grid">
+<div class="card">
+<h2 id="name">—</h2>
+<div id="meta"></div>
+<div class="evidence" id="evidence"></div>
+</div>
+<div class="card">
+<h2>Scoring</h2>
+<div id="questions"></div>
+<div class="total">Total: <span id="total">0</span> / 40</div>
+<div id="recommend" class="recommend none">Abstain</div>
+<label>Reviewer Comments</label>
+<textarea id="comments"></textarea>
+</div>
+</div>
+</div>
+<footer>Read-only applicant data. Scores saved to localStorage. Export CSV for pasting back to workbook.</footer>
+</main>
+<script>
+const fileInput = document.getElementById('file');
+const statusEl = document.getElementById('status');
+const appEl = document.getElementById('app');
+let applicants = [];
+let current = 0;
+let header = [];
+let scoreCols = [];
+let evidenceCols = [];
+
+const rubric = {
+1:'Limited Evidence',
+2:'Emerging Contributor',
+3:'Solid Contributor',
+4:'Strong Contributor',
+5:'Exceptional Contributor'
+};
+
+fileInput.addEventListener('change', e=>{
+ const file = e.target.files[0];
+ if(!file) return;
+ statusEl.textContent='Parsing…';
+ const reader = new FileReader();
+ reader.onload = ev=>{
+   try{
+     const data = new Uint8Array(ev.target.result);
+     const wb = XLSX.read(data,{type:'array'});
+     const sheetName = wb.SheetNames.includes('Reviewer 10') ? 'Reviewer 10' : wb.SheetNames[0];
+     const ws = wb.Sheets[sheetName];
+     const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+     // find header row containing Submission ID
+     let headerIdx = rows.findIndex(r=> r && r.some(c=> String(c).includes('Submission ID')));
+     if(headerIdx===-1) headerIdx=3;
+     header = rows[headerIdx].map(h=> String(h||'').trim());
+     const dataRows = rows.slice(headerIdx+1).filter(r=> r && r[0]);
+     applicants = dataRows.map(r=>{
+       const obj={};
+       header.forEach((h,i)=> obj[h]= r[i] ?? '');
+       return obj;
+     });
+     // identify score columns
+     scoreCols = header.filter(h=>/^Question \d+ Score/.test(h));
+     evidenceCols = header.filter(h=> !/^Question \d+ Score/.test(h) && !/Total Score|Reviewer Recommendation|Reviewer Comments|Review Status/i.test(h));
+     initUI();
+     statusEl.textContent=`Loaded ${applicants.length} applicants from sheet ${sheetName}`;
+     appEl.style.display='block';
+   }catch(err){
+     statusEl.textContent='Error parsing file: '+err.message;
+   }
+ };
+ reader.readAsArrayBuffer(file);
+});
+
+function initUI(){
+ document.getElementById('index').innerHTML = applicants.map((a,i)=>`<option value="${i}">${a[header[header.indexOf('Nominee Full Name')]]||a[header[1]]||'Applicant '+(i+1)}</option>`).join('');
+ document.getElementById('index').value = current;
+ render();
+}
+
+document.getElementById('prev').onclick=()=>{ current = Math.max(0,current-1); updateNav(); };
+document.getElementById('next').onclick=()=>{ current = Math.min(applicants.length-1,current+1); updateNav(); };
+document.getElementById('index').onchange=e=>{ current = +e.target.value; updateNav(); };
+document.getElementById('export').onclick=exportCSV;
+
+function updateNav(){
+ document.getElementById('index').value = current;
+ render();
+}
+function render(){
+ const a = applicants[current];
+ if(!a) return;
+ document.getElementById('name').textContent = a[header[header.indexOf('Nominee Full Name')]] || 'Unnamed';
+ const meta = [
+   ['Submission ID', header.includes('Submission ID')? a['Submission ID']:''],
+   ['Issue URL', header.includes('Issue URL')? a['Issue URL']:'' ],
+   ['GitHub Username', header.includes('GitHub Username')? a['GitHub Username']:'' ],
+   ['Current Location', header.includes('Current Location')? a['Current Location']:'' ],
+   ['Years of Community Involvement', header.includes('Years of Community Involvement')? a['Years of Community Involvement']:'' ]
+ ];
+ document.getElementById('meta').innerHTML = meta.map(([k,v])=> v? `<div><b>${k}:</b> ${k.includes('URL')? `<a href="${v}" target="_blank">${v}</a>`:v}</div>`:'').join('');
+ // evidence
+ let evHtml='<dl>';
+ evidenceCols.forEach(col=>{
+   if(col==='Submission ID'||col==='Issue URL'||col==='GitHub Username'||col==='Nominee Full Name'||col==='Current Location'||col==='Years of Community Involvement') return;
+   const v = String(a[col]||'');
+   if(!v) return;
+   const safe = v.replace(/</g,'&lt;');
+   evHtml+=`<dt>${col}</dt><dd>${makeLinks(safe)}</dd>`;
+ });
+ evHtml+='</dl>';
+ document.getElementById('evidence').innerHTML = evHtml;
+ // questions
+ const saved = loadState(a['Submission ID']);
+ const qContainer = document.getElementById('questions');
+ qContainer.innerHTML = scoreCols.map((col,i)=>{
+   const qNum = i+1;
+   const qText = col.replace(/^Question \d+ Score \(1–5\)\s*/,'').replace(/^Question \d+ Score/,'').trim() || `Question ${qNum}`;
+   const val = saved.scores[qNum] || '';
+   return `<div class="score-q">
+     <h3>Q${qNum} ${qText}<button type="button" onclick="showRubric(${qNum})">?</button></h3>
+     <div class="radios">${[1,2,3,4,5].map(v=>`<label><input type="radio" name="q${qNum}" value="${v}" ${v==val?'checked':''}> ${v}</label>`).join('')}</div>
+     <div class="rubric">1 Limited • 2 Emerging • 3 Solid • 4 Strong • 5 Exceptional</div>
+   </div>`;
+ }).join('');
+ // bind radios
+ scoreCols.forEach((col,i)=>{
+   const qNum=i+1;
+   document.querySelectorAll(`input[name="q${qNum}"]`).forEach(inp=>{
+     inp.onchange=e=>{ saved.scores[qNum]=+e.target.value; saveState(a['Submission ID'],saved); recalc(); };
+   });
+ });
+ document.getElementById('comments').value = saved.comments||'';
+ document.getElementById('comments').oninput=e=>{ saved.comments=e.target.value; saveState(a['Submission ID'],saved); };
+ document.getElementById('progress').textContent = `Applicant ${current+1} of ${applicants.length}`;
+ recalc();
+}
+
+function makeLinks(text){
+ return text.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank">$1</a>');
+}
+function showRubric(q){
+ alert('Scoring rubric:\n1 Limited Evidence\n2 Emerging Contributor\n3 Solid Contributor\n4 Strong Contributor\n5 Exceptional Contributor');
+}
+function recalc(){
+ const saved = loadState(applicants[current]['Submission ID']);
+ let total=0, count=0;
+ scoreCols.forEach((_,i)=>{ const v=saved.scores[i+1]; if(v){ total+=v; count++; } });
+ document.getElementById('total').textContent = total;
+ const recEl=document.getElementById('recommend');
+ let rec='Abstain', cls='none';
+ if(count===8){
+   if(total>=32){rec='Strongly Recommend';cls='strong'}
+   else if(total>=24){rec='Recommend';cls='rec'}
+   else if(total>=16){rec='Borderline';cls='border'}
+   else {rec='Do Not Recommend';cls='none'}
+ }
+ recEl.textContent=rec;
+ recEl.className='recommend '+cls;
+}
+function loadState(id){
+ const raw=localStorage.getItem('pytorch_review_'+id);
+ if(raw) return JSON.parse(raw);
+ return {scores:{},comments:''};
+}
+function saveState(id,state){
+ localStorage.setItem('pytorch_review_'+id,JSON.stringify(state));
+}
+function exportCSV(){
+ const rows=[['Submission ID','Nominee Full Name','Q1','Q2','Q3','Q4','Q5','Q6','Q7','Q8','Total','Recommendation','Comments']];
+ applicants.forEach(a=>{
+   const id=a['Submission ID'];
+   const state=loadState(id);
+   const scores=scoreCols.map((_,i)=>state.scores[i+1]||'');
+   let total=0; scores.forEach(s=>{if(s) total+=+s;});
+   let rec='Abstain';
+   if(scores.length===8 && scores.every(Boolean)){
+     if(total>=32) rec='Strongly Recommend';
+     else if(total>=24) rec='Recommend';
+     else if(total>=16) rec='Borderline';
+     else rec='Do Not Recommend';
+   }
+   rows.push([id, a[header[header.indexOf('Nominee Full Name')]]||'', ...scores, total, rec, state.comments||'']);
+ });
+ const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+ const blob=new Blob([csv],{type:'text/csv'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');
+ a.href=url; a.download='pytorch_ambassador_scores.csv'; a.click();
+ URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

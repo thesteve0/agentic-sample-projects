@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PyTorch Ambassador Reviewer 10</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --surface3: #2c3040;
+    --border: #333850;
+    --border-light: #444a66;
+    --text: #e4e6ed;
+    --text-dim: #7a8199;
+    --text-muted: #555b73;
+    --accent: #6c63ff;
+    --accent-hover: #7b73ff;
+    --accent-dim: rgba(108,99,255,0.15);
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.12);
+    --yellow: #fbbf24;
+    --yellow-dim: rgba(251,191,36,0.12);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,0.12);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.12);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  
+  /* Loading screen */
+  #loading-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100vh; gap: 20px;
+  }
+  #loading-screen h1 { font-size: 1.5rem; color: var(--text-dim); font-weight: 500; }
+  #loading-screen p { color: var(--text-muted); font-size: 0.85rem; }
+  .file-btn {
+    padding: 12px 24px; background: var(--accent); color: white; border: none;
+    border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 500;
+    transition: background 0.2s;
+  }
+  .file-btn:hover { background: var(--accent-hover); }
+  #csv-file { display: none; }
+
+  /* Main app */
+  #app { display: none; height: 100vh; }
+  .app-layout { display: flex; height: 100%; }
+  
+  /* Sidebar */
+  .sidebar {
+    width: 300px; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 16px; border-bottom: 1px solid var(--border);
+  }
+  .sidebar-header h2 { font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; }
+  .sidebar-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sidebar-controls button {
+    padding: 5px 10px; background: var(--surface2); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 5px; cursor: pointer;
+    font-size: 0.75rem; transition: all 0.2s;
+  }
+  .sidebar-controls button:hover { background: var(--surface3); color: var(--text); }
+  .sidebar-controls button.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+  .sidebar-stats {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim);
+  }
+  .applicants-list {
+    flex: 1; overflow-y: auto; padding: 8px;
+  }
+  .applicant-item {
+    padding: 10px 12px; border-radius: 6px; cursor: pointer;
+    margin-bottom: 4px; transition: all 0.15s; border: 1px solid transparent;
+  }
+  .applicant-item:hover { background: var(--surface2); }
+  .applicant-item.active { background: var(--accent-dim); border-color: var(--accent); }
+  .applicant-name { font-size: 0.85rem; font-weight: 500; margin-bottom: 3px; }
+  .applicant-meta { font-size: 0.7rem; color: var(--text-dim); display: flex; gap: 8px; align-items: center; }
+  .score-badge {
+    padding: 1px 6px; border-radius: 3px; font-weight: 600; font-size: 0.7rem;
+    background: var(--surface3); color: var(--text-dim);
+  }
+  .score-badge.has-score { color: var(--accent); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.complete { background: var(--green); }
+  .status-dot.in-progress { background: var(--yellow); }
+  .status-dot.not-started { background: var(--text-muted); }
+
+  /* Main content */
+  .main-content {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .top-bar {
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); flex-shrink: 0;
+  }
+  .top-bar-left { display: flex; align-items: center; gap: 12px; }
+  .top-bar h1 { font-size: 1rem; font-weight: 600; }
+  .top-bar-right { display: flex; align-items: center; gap: 8px; }
+  .nav-btn {
+    padding: 6px 14px; background: var(--surface2); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    font-size: 0.8rem; transition: all 0.2s;
+  }
+  .nav-btn:hover { background: var(--surface3); color: var(--text); }
+  .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .action-btn {
+    padding: 6px 14px; border-radius: 6px; cursor: pointer;
+    font-size: 0.8rem; font-weight: 500; transition: all 0.2s; border: 1px solid transparent;
+  }
+  .action-btn.primary { background: var(--accent); color: white; }
+  .action-btn.primary:hover { background: var(--accent-hover); }
+  .action-btn.secondary { background: var(--surface2); color: var(--text-dim); border-color: var(--border); }
+  .action-btn.secondary:hover { background: var(--surface3); color: var(--text); }
+
+  /* Content area */
+  .content-area {
+    flex: 1; display: flex; overflow: hidden;
+  }
+  
+  /* Info panel (left) */
+  .info-panel {
+    flex: 1; overflow-y: auto; padding: 20px; border-right: 1px solid var(--border);
+    min-width: 0;
+  }
+  .info-header { margin-bottom: 20px; }
+  .info-header h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 6px; }
+  .info-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .info-meta span { font-size: 0.8rem; color: var(--text-dim); display: flex; align-items: center; gap: 4px; }
+  .info-links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .info-links a {
+    padding: 4px 10px; background: var(--accent-dim); color: var(--accent);
+    text-decoration: none; border-radius: 4px; font-size: 0.75rem; font-weight: 500;
+    transition: all 0.2s;
+  }
+  .info-links a:hover { background: rgba(108,99,255,0.25); }
+  .info-section { margin-bottom: 20px; }
+  .info-section h3 { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .info-section p { font-size: 0.85rem; color: var(--text-dim); line-height: 1.6; white-space: pre-wrap; }
+  .placeholder { color: var(--text-muted); font-style: italic; }
+  .checklist { display: flex; flex-direction: column; gap: 4px; }
+  .checklist label {
+    display: flex; align-items: center; gap: 8px; font-size: 0.8rem;
+    color: var(--text-dim); padding: 4px 0;
+  }
+  .checklist input[type="checkbox"] { accent-color: var(--accent); cursor: not-allowed; }
+
+  /* Scoring panel (right) */
+  .scoring-panel {
+    width: 380px; overflow-y: auto; padding: 20px; background: var(--surface);
+    flex-shrink: 0;
+  }
+  .scoring-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+  .scoring-header h3 { font-size: 0.95rem; font-weight: 600; }
+  .total-score-display {
+    text-align: center; padding: 12px; background: var(--surface2);
+    border-radius: 8px; margin-bottom: 16px;
+  }
+  .total-score-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+  .total-score-label { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; }
+  .recommendation-display {
+    text-align: center; padding: 8px 12px; border-radius: 6px;
+    margin-bottom: 16px; font-size: 0.85rem; font-weight: 600;
+  }
+  .recommendation-display.tr-strong { background: var(--green-dim); color: var(--green); }
+  .recommendation-display.tr-recommend { background: var(--blue-dim); color: var(--blue); }
+  .recommendation-display.tr-borderline { background: var(--yellow-dim); color: var(--yellow); }
+  .recommendation-display.tr-dont { background: var(--red-dim); color: var(--red); }
+  .recommendation-display.tr-none { background: var(--surface2); color: var(--text-dim); }
+  
+  .question-group { margin-bottom: 16px; }
+  .question-group-header {
+    font-size: 0.8rem; font-weight: 600; color: var(--text); margin-bottom: 6px;
+    padding: 6px 10px; background: var(--surface2); border-radius: 5px;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  }
+  .question-group-header:hover { background: var(--surface3); }
+  .question-group-header .toggle { font-size: 0.7rem; color: var(--text-dim); }
+  .question-item {
+    padding: 10px 10px 10px 16px; margin-bottom: 6px; background: var(--surface2);
+    border-radius: 6px; border-left: 3px solid var(--border);
+  }
+  .question-text { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
+  .score-controls { display: flex; gap: 4px; }
+  .score-btn {
+    width: 36px; height: 32px; border: 1px solid var(--border); background: var(--surface3);
+    color: var(--text-dim); border-radius: 5px; cursor: pointer; font-size: 0.85rem;
+    font-weight: 600; transition: all 0.15s;
+  }
+  .score-btn:hover { background: var(--border-light); color: var(--text); }
+  .score-btn.selected { background: var(--accent); color: white; border-color: var(--accent); }
+  .score-btn[data-score="1"].selected { background: var(--red); border-color: var(--red); }
+  .score-btn[data-score="2"].selected { background: var(--yellow); border-color: var(--yellow); color: #1a1d27; }
+  .score-btn[data-score="3"].selected { background: var(--blue); border-color: var(--blue); }
+  .score-btn[data-score="4"].selected { background: var(--green); border-color: var(--green); }
+  .score-btn[data-score="5"].selected { background: var(--green); border-color: var(--green); }
+
+  .scoring-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .scoring-footer label { font-size: 0.8rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+  .scoring-footer select, .scoring-footer textarea {
+    width: 100%; padding: 8px 10px; background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem;
+    font-family: inherit; transition: border-color 0.2s;
+  }
+  .scoring-footer select:focus, .scoring-footer textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .scoring-footer textarea { resize: vertical; min-height: 80px; margin-bottom: 12px; }
+  .save-indicator {
+    text-align: center; padding: 8px; border-radius: 6px; font-size: 0.75rem;
+    margin-bottom: 12px; opacity: 0; transition: opacity 0.3s;
+  }
+  .save-indicator.show { opacity: 1; }
+  .save-indicator.success { background: var(--green-dim); color: var(--green); }
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    .scoring-panel { width: 320px; }
+    .sidebar { width: 260px; }
+  }
+  @media (max-width: 900px) {
+    .app-layout { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+    .content-area { flex-direction: column; }
+    .info-panel { border-right: none; border-bottom: 1px solid var(--border); }
+    .scoring-panel { width: 100%; }
+  }
+
+  /* Rubric panel */
+  .rubric-panel {
+    position: fixed; right: 0; top: 0; height: 100vh; width: 420px;
+    background: var(--surface); border-left: 1px solid var(--border);
+    box-shadow: -5px 0 25px rgba(0,0,0,0.3); z-index: 100;
+    display: none; flex-direction: column;
+  }
+  .rubric-panel.open { display: flex; }
+  .rubric-header {
+    padding: 16px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .rubric-header h3 { font-size: 1rem; font-weight: 600; }
+  .rubric-close {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 1.2rem; padding: 4px 8px;
+  }
+  .rubric-content { flex: 1; overflow-y: auto; padding: 16px; }
+  .rubric-item { margin-bottom: 20px; }
+  .rubric-item h4 { font-size: 0.85rem; color: var(--accent); margin-bottom: 6px; }
+  .rubric-item p { font-size: 0.8rem; color: var(--text-dim); line-height: 1.5; }
+  .rubric-scale { display: flex; gap: 4px; margin-top: 6px; }
+  .rubric-scale-item {
+    flex: 1; padding: 6px; background: var(--surface2); border-radius: 4px;
+    text-align: center; font-size: 0.7rem; color: var(--text-dim);
+  }
+  .rubric-scale-item strong { display: block; color: var(--text); font-size: 0.75rem; margin-bottom: 2px; }
+
+  /* Overlay */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99;
+    display: none;
+  }
+  .overlay.open { display: block; }
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <h1>PyTorch Ambassador Reviewer 10</h1>
+  <p>Select the JSON file to load applicant data</p>
+  <button class="file-btn" onclick="document.getElementById('json-file').click()">Load Applicants</button>
+  <input type="file" id="json-file" accept=".json">
+  <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
+    Generate with: <code style="color: var(--text-dim);">python3 parse_xlsx.py &gt; applicants.json</code>
+  </p>
+</div>
+
+<div id="app">
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>Applicants</h2>
+        <div class="sidebar-controls">
+          <button class="active" onclick="setSort('status')">Status</button>
+          <button onclick="setSort('score')">Score</button>
+          <button onclick="setSort('name')">Name</button>
+          <button onclick="toggleFilter('pending')">Pending</button>
+          <button onclick="toggleFilter('done')">Done</button>
+        </div>
+      </div>
+      <div class="sidebar-stats" id="sidebar-stats"></div>
+      <div class="applicants-list" id="applicants-list"></div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+      <div class="top-bar">
+        <div class="top-bar-left">
+          <h1 id="top-title">No applicant selected</h1>
+        </div>
+        <div class="top-bar-right">
+          <button class="nav-btn" onclick="prevApplicant()" id="btn-prev" disabled>← Prev</button>
+          <button class="nav-btn" onclick="nextApplicant()" id="btn-next" disabled>Next →</button>
+          <button class="action-btn secondary" onclick="toggleRubric()">📖 Rubric</button>
+          <button class="action-btn primary" onclick="saveAndExport()">💾 Save & Export</button>
+        </div>
+      </div>
+
+      <div class="content-area">
+        <!-- Info panel -->
+        <div class="info-panel" id="info-panel">
+          <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+            <p>Select an applicant to review their details</p>
+          </div>
+        </div>
+
+        <!-- Scoring panel -->
+        <div class="scoring-panel" id="scoring-panel">
+          <div class="scoring-header">
+            <h3>Scoring</h3>
+          </div>
+          <div class="total-score-display">
+            <div class="total-score-value" id="total-score">—</div>
+            <div class="total-score-label">Total Score (0–40)</div>
+          </div>
+          <div class="recommendation-display tr-none" id="recommendation-display">
+            Select scores to begin
+          </div>
+
+          <div id="questions-container"></div>
+
+          <div class="scoring-footer">
+            <label>Reviewer Recommendation</label>
+            <select id="recommendation-select" onchange="updateRecommendation()">
+              <option value="">Select recommendation…</option>
+              <option value="Strongly Recommend">Strongly Recommend</option>
+              <option value="Recommend">Recommend</option>
+              <option value="Borderline">Borderline</option>
+              <option value="Do Not Recommend">Do Not Recommend</option>
+              <option value="Abstain (Conflict of Interest)">Abstain (Conflict of Interest)</option>
+            </select>
+            <label style="margin-top: 12px;">Reviewer Comments</label>
+            <textarea id="comments-text" placeholder="Add your comments here…" oninput="updateComment()"></textarea>
+            <div class="save-indicator" id="save-indicator">✓ Saved</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Rubric panel -->
+<div class="overlay" id="overlay" onclick="toggleRubric()"></div>
+<div class="rubric-panel" id="rubric-panel">
+  <div class="rubric-header">
+    <h3>Scoring Rubric Reference</h3>
+    <button class="rubric-close" onclick="toggleRubric()">×</button>
+  </div>
+  <div class="rubric-content" id="rubric-content"></div>
+</div>
+
+<script>
+// ========================================================================
+// Rubric data
+// ========================================================================
+const QUESTIONS = {
+  q1: {
+    text: 'Has the nominee demonstrated meaningful engagement with PyTorch Foundation projects or communities?',
+    area: 'Foundation Project Engagement',
+    rubric: '5: Sustained, deep engagement across multiple PyTorch Foundation projects or communities with visible impact. 4: Regular, consistent engagement with PyTorch Foundation projects or communities, showing understanding and commitment. 3: Some engagement with PyTorch Foundation projects or communities, though may be limited in scope or duration. 2: Minimal or occasional engagement, with unclear connection to PyTorch Foundation projects. 1: Little or no engagement with PyTorch Foundation projects or communities.'
+  },
+  q2: {
+    text: 'Has the nominee demonstrated measurable impact through technical contributions, community engagement, documentation, education, mentorship, or advocacy within PyTorch Foundation projects or communities?',
+    area: 'Community Impact',
+    rubric: '5: Exceptional, well-documented impact with clear, verifiable evidence of significant contributions across multiple areas. 4: Strong impact with solid evidence of meaningful contributions in at least one major area. 3: Moderate impact with some evidence of contributions, though scope or depth is limited. 2: Minimal impact with weak or insufficient evidence of contributions. 1: No measurable impact or contributions to demonstrate.'
+  },
+  q3: {
+    text: 'Has the nominee actively supported, mentored, educated, or organized activities for the community?',
+    area: 'Community Impact',
+    rubric: '5: Extensive, sustained mentoring/education with clear evidence of community impact and growth of others. 4: Regular mentoring, education, or support activities with positive outcomes for participants. 3: Some mentoring or educational activities, but limited in scope, frequency, or impact. 2: Occasional or minimal support activities with unclear impact. 1: No evidence of mentoring, education, or community support activities.'
+  },
+  q4: {
+    text: 'Has the nominee helped others learn, participate, contribute, or build community?',
+    area: 'Community Impact',
+    rubric: '5: Consistently helps others at multiple levels — learning, participation, contribution, and community building — with demonstrable impact. 4: Regularly helps others in meaningful ways, with evidence of positive outcomes. 3: Some evidence of helping others, though inconsistent or limited in scope. 2: Minimal or occasional help to others, with unclear impact. 1: No evidence of helping others learn, participate, or contribute.'
+  },
+  q5: {
+    text: 'Does the nominee present a clear, realistic, and achievable plan for Ambassador activities?',
+    area: 'Ambassador Potential',
+    rubric: '5: Exceptional, detailed, realistic plan with clear milestones, timelines, and measurable outcomes. 4: Strong, well-defined plan with realistic goals and good understanding of Ambassador role. 3: Adequate plan with some detail, but may lack specificity or realism in some areas. 2: Vague or overly ambitious plan with limited feasibility. 1: No clear plan or plan is not realistic/achievable.'
+  },
+  q6: {
+    text: 'Are the proposed activities likely to create meaningful value for PyTorch Foundation projects and communities?',
+    area: 'Ambassador Potential',
+    rubric: '5: Activities would create significant, measurable value with broad community impact and strong alignment to Foundation goals. 4: Activities would create substantial value with clear benefits to PyTorch Foundation projects and communities. 3: Activities would create some value, but impact may be limited or uncertain. 2: Activities would create minimal value or unclear benefit to the community. 1: Activities would create no meaningful value or misalign with Foundation priorities.'
+  },
+  q7: {
+    text: 'Has the nominee demonstrated the ability to communicate technical concepts effectively?',
+    area: 'Communication & Advocacy',
+    rubric: '5: Exceptional communication skills with clear, well-structured content that effectively conveys complex concepts to diverse audiences. 4: Strong communication skills with good evidence of clear, effective technical communication. 3: Adequate communication skills, though some content may be unclear or poorly structured. 2: Weak communication skills with limited ability to convey technical concepts clearly. 1: Poor communication skills or no evidence of effective technical communication.'
+  },
+  q8: {
+    text: 'Does the nominee demonstrate the knowledge, engagement, and communication skills necessary to effectively represent PyTorch Foundation projects and communities as an Ambassador?',
+    area: 'Communication & Advocacy',
+    rubric: '5: Exceptional combination of deep knowledge, active engagement, and strong communication skills — clearly ready to represent PyTorch Foundation. 4: Strong overall profile with good knowledge, engagement, and communication skills for Ambassador role. 3: Adequate profile but may have gaps in knowledge, engagement, or communication skills. 2: Significant gaps in one or more areas needed for effective representation. 1: Does not demonstrate the necessary knowledge, engagement, or communication skills for Ambassador role.'
+  }
+};
+
+const AREAS = [
+  { name: 'Foundation Project Engagement', icon: '🏗️', qs: ['q1'] },
+  { name: 'Community Impact', icon: '🌟', qs: ['q2', 'q3', 'q4'] },
+  { name: 'Ambassador Potential', icon: '🚀', qs: ['q5', 'q6'] },
+  { name: 'Communication & Advocacy', icon: '💬', qs: ['q7', 'q8'] }
+];
+
+// ========================================================================
+// State
+// ========================================================================
+let applicants = [];
+let scores = {};       // { id: {q1..q8, recommendation, comments, status} }
+let currentIndex = -1;
+let currentSort = 'status';
+let showOnlyDone = false;
+let showOnlyPending = false;
+let rawApplicants = []; // Keep raw applicant objects for export
+
+// ========================================================================
+// Field name normalization helper
+// ========================================================================
+// CSV headers may contain curly apostrophes (' vs '). This normalizes access.
+function getField(app, longName) {
+  // Normalize curly apostrophes (U+2019) to straight apostrophe
+  const normalize = s => s.replace(/'/g, "'");
+  const normalized = normalize(longName);
+  for (const k of Object.keys(app)) {
+    if (normalize(k) === normalized) return app[k];
+  }
+  return app[longName] || '';
+}
+
+// ========================================================================
+// Scoring helpers
+// ========================================================================
+function SCORE_KEY(id) { return String(id); }
+
+function getScore(id) {
+  const key = SCORE_KEY(id);
+  return scores[key] || { q1:0,q2:0,q3:0,q4:0,q5:0,q6:0,q7:0,q8:0, recommendation:'', comments:'', status:'unscored' };
+}
+
+function setScore(id, q, value) {
+  const key = SCORE_KEY(id);
+  if (!scores[key]) scores[key] = { q1:0,q2:0,q3:0,q4:0,q5:0,q6:0,q7:0,q8:0, recommendation:'', comments:'', status:'unscored' };
+  scores[key]['q'+q] = value;
+  scores[key].status = getStatus(scores[key]);
+  autoSave();
+  renderAll();
+}
+
+function calcTotal(score) {
+  return (score.q1||0) + (score.q2||0) + (score.q3||0) + (score.q4||0) +
+         (score.q5||0) + (score.q6||0) + (score.q7||0) + (score.q8||0);
+}
+
+function getRec(total) {
+  if (total === 0) return null;
+  if (total >= 32) return { label: 'Strongly Recommend', cls: 'tr-strong' };
+  if (total >= 24) return { label: 'Recommend', cls: 'tr-recommend' };
+  if (total >= 16) return { label: 'Borderline', cls: 'tr-borderline' };
+  return { label: 'Do Not Recommend', cls: 'tr-dont' };
+}
+
+function isComplete(score) {
+  return score.q1 && score.q2 && score.q3 && score.q4 && score.q5 && score.q6 && score.q7 && score.q8 && score.recommendation;
+}
+
+function getStatus(score) {
+  if (!score || !score.q1 && !score.q2 && !score.q3 && !score.q4 && !score.q5 && !score.q6 && !score.q7 && !score.q8) return 'not-started';
+  if (isComplete(score)) return 'complete';
+  return 'in-progress';
+}
+
+// ========================================================================
+// Rendering
+// ========================================================================
+function renderAll() {
+  renderSidebar();
+  if (currentIndex >= 0 && applicants[currentIndex]) {
+    renderInfo();
+    renderScoring();
+  }
+}
+
+function getFilteredApplicants() {
+  let list = [...applicants];
+  
+  // Apply filters
+  if (showOnlyDone) list = list.filter(a => {
+    const s = getScore(a._id);
+    return getStatus(s) === 'complete';
+  });
+  if (showOnlyPending) list = list.filter(a => {
+    const s = getScore(a._id);
+    return getStatus(s) !== 'complete';
+  });
+  
+  // Sort
+  list.sort((a, b) => {
+    const sa = getScore(a._id), sb = getScore(b._id);
+    const ta = calcTotal(sa), tb = calcTotal(sb);
+    const na = (getField(a,'Nominee Full Name')||'').trim().replace(/\n/g,' ');
+    const nb = (getField(b,'Nominee Full Name')||'').trim().replace(/\n/g,' ');
+    const sta = getStatus(sa), stb = getStatus(sb);
+    
+    if (currentSort === 'score') {
+      if (tb !== ta) return tb - ta;
+      return na.localeCompare(nb);
+    }
+    if (currentSort === 'name') {
+      return na.localeCompare(nb);
+    }
+    // status sort
+    const order = { 'complete': 0, 'in-progress': 1, 'not-started': 2 };
+    if (order[sta] !== order[stb]) return order[sta] - order[stb];
+    return na.localeCompare(nb);
+  });
+  
+  return list;
+}
+
+function renderSidebar() {
+  const list = getFilteredApplicants();
+  const container = document.getElementById('applicants-list');
+  
+  const stats = document.getElementById('sidebar-stats');
+  const completed = applicants.filter(a => getStatus(getScore(a._id)) === 'complete').length;
+  const pending = applicants.length - completed;
+  stats.innerHTML = `
+    <span>Total: <strong>${applicants.length}</strong></span>
+    <span>✓ <strong>${completed}</strong></span>
+    <span>⏳ <strong>${pending}</strong></span>
+  `;
+  
+  container.innerHTML = list.map((app, i) => {
+    const score = getScore(app._id);
+    const total = calcTotal(score);
+    const name = (getField(app,'Nominee Full Name')||'').trim().replace(/\n/g,' ');
+    const isActive = app._id === (currentIndex >= 0 ? applicants[currentIndex]._id : -1);
+    const status = getStatus(score);
+    const scoreClass = total > 0 ? 'has-score' : '';
+    
+    return `
+      <div class="applicant-item ${isActive ? 'active' : ''}" onclick="selectApplicant(${app._id})">
+        <div class="applicant-name">${name}</div>
+        <div class="applicant-meta">
+          <span class="status-dot ${status}"></span>
+          <span>${status === 'complete' ? 'Complete' : status === 'in-progress' ? 'In Progress' : 'Not Started'}</span>
+          ${total > 0 ? `<span class="score-badge ${scoreClass}">${total}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderInfo() {
+  if (currentIndex < 0 || !applicants[currentIndex]) return;
+  const app = applicants[currentIndex];
+  const name = (getField(app,'Nominee Full Name')||'').trim().replace(/\n/g,' ');
+  const loc = (getField(app,'Current Location')||'').trim().replace(/\n/g,' ');
+  const years = (getField(app,'Years of Community Involvement')||'').trim().replace(/\n/g,' ');
+
+  // Build links
+  const links = [];
+  const gh = getField(app,'GitHub Profile');
+  const pw = getField(app,'Personal Website / Portfolio');
+  const gl = getField(app,'GitLab Profile');
+  const li = getField(app,'LinkedIn Profile');
+  const tw = getField(app,'X / Twitter Profile');
+  if (gh && gh !== '_No response_') links.push({url: gh, text:'GitHub'});
+  if (pw && !['_No response_','- [x] Other'].includes(pw)) links.push({url: pw, text:'Website'});
+  if (gl && gl !== '_No response_') links.push({url: gl, text:'GitLab'});
+  if (li && li !== '_No response_') links.push({url: li, text:'LinkedIn'});
+  if (tw && tw !== '_No response_') links.push({url: tw, text:'Twitter'});
+
+  const linksHTML = links.map(l => `<a href="${l.url}" target="_blank">${l.text}</a>`).join('');
+
+  // Checkbox lists helper
+  function checkboxList(text, placeholder) {
+    if (!text || text === '_No response_') return `<p class="placeholder">${placeholder}</p>`;
+    const lines = text.split('\n').filter(l => l.trim());
+    return `<div class="checklist">${lines.map(l => {
+      const checked = l.includes('[x]');
+      const clean = l.replace(/^- \[x\]\s*/,'').replace(/^- \[ \]\s*/,'').trim();
+      return `<label><input type="checkbox" disabled ${checked?'checked':''}> ${clean}</label>`;
+    }).join('')}</div>`;
+  }
+
+  document.getElementById('info-panel').innerHTML = `
+    <div class="info-header">
+      <h2>${name}</h2>
+      <div class="meta">
+        ${loc ? `<span>📍 ${loc}</span>` : ''}
+        ${years ? `<span>📅 ${years}</span>` : ''}
+      </div>
+      ${linksHTML ? `<div class="info-links">${linksHTML}</div>` : ''}
+    </div>
+
+    <div class="info-section">
+      <h3>Projects Familiar With</h3>
+      ${checkboxList(getField(app,'Which PyTorch Foundation projects is the nominee familiar with?'), 'No response')}
+    </div>
+
+    <div class="info-section">
+      <h3>Contribution Types</h3>
+      ${checkboxList(getField(app, 'How has the nominee contributed to the community?'), 'No response')}
+    </div>
+
+    <div class="info-section">
+      <h3>PyTorch Foundation Contributions</h3>
+      <p>${formatText(getField(app, "Please describe the nominee's contributions to PyTorch Foundation projects and communities"))}</p>
+    </div>
+
+    <div class="info-section">
+      <h3>Why Ambassador?</h3>
+      <p>${formatText(getField(app, 'Why does the nominee want to become a PyTorch Foundation Ambassador?'))}</p>
+    </div>
+
+    <div class="info-section">
+      <h3>Proposed Ambassador Contributions</h3>
+      <p>${formatText(getField(app, 'How would this nominee contribute as a PyTorch Foundation Ambassador?'))}</p>
+    </div>
+
+    <div class="info-section">
+      <h3>Ambassador Focus Areas</h3>
+      ${checkboxList(getField(app, 'Ambassador Focus Areas'), 'No response')}
+    </div>
+
+    <div class="info-section">
+      <h3>Additional Information</h3>
+      <p>${formatText(getField(app, 'Additional Information (Optional)'))}</p>
+    </div>
+  `;
+}
+
+function formatText(text) {
+  if (!text || text === '_No response_') return '<p class="placeholder">No response</p>';
+  return `<p>${text.replace(/\n/g,'<br>')}</p>`;
+}
+
+function renderScoring() {
+  if (currentIndex < 0 || !applicants[currentIndex]) return;
+  const app = applicants[currentIndex];
+  const score = getScore(app._id);
+  const total = calcTotal(score);
+  const rec = getRec(total);
+
+  // Update total display
+  document.getElementById('total-score').textContent = total || '—';
+  
+  // Update recommendation display
+  const recEl = document.getElementById('recommendation-display');
+  if (rec) {
+    recEl.className = `recommendation-display ${rec.cls}`;
+    recEl.textContent = rec.label;
+  } else {
+    recEl.className = 'recommendation-display tr-none';
+    recEl.textContent = 'Select scores to begin';
+  }
+
+  // Update recommendation select
+  document.getElementById('recommendation-select').value = score.recommendation || '';
+  
+  // Update comments
+  document.getElementById('comments-text').value = score.comments || '';
+
+  // Render questions grouped by area
+  const container = document.getElementById('questions-container');
+  container.innerHTML = AREAS.map(area => {
+    return `
+      <div class="question-group">
+        <div class="question-group-header">
+          <span>${area.icon} ${area.name}</span>
+        </div>
+        ${area.qs.map(q => {
+          const qData = QUESTIONS[q];
+          const currentVal = score[q] || 0;
+          return `
+            <div class="question-item">
+              <div class="question-text">${qData.text}</div>
+              <div class="score-controls">
+                ${[1,2,3,4,5].map(s => `
+                  <button class="score-btn ${currentVal === s ? 'selected' : ''}" 
+                          data-score="${s}" 
+                          onclick="setScore(${app._id}, '${q}', ${s})">
+                    ${s}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }).join('');
+
+  // Update nav buttons
+  const filtered = getFilteredApplicants();
+  const visibleIdx = filtered.findIndex(a => a._id === app._id);
+  document.getElementById('btn-prev').disabled = visibleIdx <= 0;
+  document.getElementById('btn-next').disabled = visibleIdx >= filtered.length - 1;
+  
+  // Update title
+  document.getElementById('top-title').textContent = `Reviewing: ${getField(app,'Nominee Full Name')}`;
+}
+
+// ========================================================================
+// Navigation
+// ========================================================================
+function selectApplicant(id) {
+  const app = applicants.find(a => a._id === id);
+  if (!app) return;
+  currentIndex = applicants.indexOf(app);
+  renderAll();
+}
+
+function prevApplicant() {
+  const filtered = getFilteredApplicants();
+  const currentIdx = filtered.findIndex(a => a._id === applicants[currentIndex]?._id);
+  if (currentIdx > 0) {
+    selectApplicant(filtered[currentIdx - 1]._id);
+  }
+}
+
+function nextApplicant() {
+  const filtered = getFilteredApplicants();
+  const currentIdx = filtered.findIndex(a => a._id === applicants[currentIndex]?._id);
+  if (currentIdx < filtered.length - 1) {
+    selectApplicant(filtered[currentIdx + 1]._id);
+  }
+}
+
+// ========================================================================
+// Sorting & filtering
+// ========================================================================
+function setSort(sort) {
+  currentSort = sort;
+  document.querySelectorAll('.sidebar-controls button').forEach(btn => {
+    if (!btn.classList.contains('active') && !btn.classList.contains('secondary')) {
+      btn.classList.remove('active');
+    }
+  });
+  event.target.classList.add('active');
+  renderSidebar();
+}
+
+function toggleFilter(type) {
+  if (type === 'done') {
+    showOnlyDone = !showOnlyDone;
+    showOnlyPending = false;
+  } else if (type === 'pending') {
+    showOnlyPending = !showOnlyPending;
+    showOnlyDone = false;
+  }
+  renderSidebar();
+}
+
+// ========================================================================
+// Scoring updates
+// ========================================================================
+function updateRecommendation() {
+  if (currentIndex < 0) return;
+  const id = applicants[currentIndex]._id;
+  const key = SCORE_KEY(id);
+  if (!scores[key]) scores[key] = { q1:0,q2:0,q3:0,q4:0,q5:0,q6:0,q7:0,q8:0, recommendation:'', comments:'', status:'unscored' };
+  scores[key].recommendation = document.getElementById('recommendation-select').value;
+  scores[key].status = getStatus(scores[key]);
+  autoSave();
+  renderAll();
+}
+
+function updateComment() {
+  if (currentIndex < 0) return;
+  const id = applicants[currentIndex]._id;
+  const key = SCORE_KEY(id);
+  if (!scores[key]) scores[key] = { q1:0,q2:0,q3:0,q4:0,q5:0,q6:0,q7:0,q8:0, recommendation:'', comments:'', status:'unscored' };
+  scores[key].comments = document.getElementById('comments-text').value;
+  autoSave();
+}
+
+// ========================================================================
+// Persistence
+// ========================================================================
+function saveToStorage() {
+  localStorage.setItem('pytorch_reviewer_scores', JSON.stringify(scores));
+}
+
+function loadFromStorage() {
+  const data = localStorage.getItem('pytorch_reviewer_scores');
+  if (data) {
+    try {
+      scores = JSON.parse(data);
+    } catch(e) {
+      console.warn('Failed to load scores from localStorage:', e);
+    }
+  }
+}
+
+let saveTimeout;
+function autoSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveToStorage();
+    const indicator = document.getElementById('save-indicator');
+    indicator.classList.add('show', 'success');
+    setTimeout(() => indicator.classList.remove('show', 'success'), 2000);
+  }, 500);
+}
+
+// ========================================================================
+// Export
+// ========================================================================
+function saveAndExport() {
+  if (applicants.length === 0) return;
+  const app = applicants[0];
+  const headers = Object.keys(app).filter(k => k !== '_id');
+
+  const esc = v => {
+    v = v || '';
+    if (v.includes(',') || v.includes('\n') || v.includes('"')) v = '"' + v.replace(/"/g,'""') + '"';
+    return v;
+  };
+
+  // Build export data with scores merged in
+  const exportData = applicants.map(app => {
+    const row = {};
+    headers.forEach(h => { row[h] = getField(app, h); });
+    const key = SCORE_KEY(app._id);
+    const score = scores[key] || {};
+    row['Total Score'] = calcTotal(score);
+    row['Reviewer Recommendation'] = score.recommendation || '';
+    row['Reviewer Comments'] = score.comments || '';
+    row['Review Status'] = score.status || 'unscored';
+    return row;
+  });
+
+  const csvLines = [headers.join(',')];
+  exportData.forEach(row => {
+    csvLines.push(headers.map(h => esc(row[h] || '')).join(','));
+  });
+  
+  const csv = csvLines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `PyTorch_Reviewer10_Scores_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ========================================================================
+// Rubric panel
+// ========================================================================
+function toggleRubric() {
+  const panel = document.getElementById('rubric-panel');
+  const overlay = document.getElementById('overlay');
+  panel.classList.toggle('open');
+  overlay.classList.toggle('open');
+  
+  if (panel.classList.contains('open') && !document.getElementById('rubric-content').innerHTML) {
+    document.getElementById('rubric-content').innerHTML = AREAS.map(area => `
+      <div class="rubric-item">
+        <h4>${area.icon} ${area.name}</h4>
+        ${area.qs.map(q => {
+          const qData = QUESTIONS[q];
+          return `
+            <div style="margin-bottom: 12px; padding: 10px; background: var(--surface2); border-radius: 5px;">
+              <p style="font-weight: 500; color: var(--text); margin-bottom: 6px;">${q.toUpperCase()}: ${qData.text}</p>
+              <p>${qData.rubric}</p>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `).join('');
+  }
+}
+
+// ========================================================================
+// File loading
+// ========================================================================
+document.getElementById('json-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data) || data.length === 0) {
+        alert('Invalid JSON data. Expected an array of applicant objects.');
+        return;
+      }
+      rawApplicants = data;
+      // Normalize field names in loaded data
+      applicants = data.map(app => {
+        const normalized = {};
+        for (const [key, value] of Object.entries(app)) {
+          normalized[key.replace(/\s+/g, ' ').replace(/['']/g, "'").trim()] = value;
+        }
+        return normalized;
+      });
+      loadFromStorage();
+      
+      // Ensure all applicants have score entries
+      applicants.forEach(a => {
+        const key = SCORE_KEY(a._id);
+        if (!scores[key]) {
+          scores[key] = { q1:0,q2:0,q3:0,q4:0,q5:0,q6:0,q7:0,q8:0, recommendation:'', comments:'', status:'unscored' };
+        }
+      });
+      
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      
+      renderSidebar();
+      // Select first uncompleted applicant, or first applicant
+      const firstIncomplete = applicants.find(a => getStatus(getScore(a._id)) !== 'complete');
+      selectApplicant(firstIncomplete ? firstIncomplete._id : applicants[0]._id);
+    } catch(err) {
+      alert('Failed to parse JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft') prevApplicant();
+  if (e.key === 'ArrowRight') nextApplicant();
+  if (e.key === 'r' || e.key === 'R') toggleRubric();
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveAndExport(); }
+});
+</script>
+</body>
+</html>
