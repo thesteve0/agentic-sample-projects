@@ -1,0 +1,12 @@
+Talk Title,Speaker 1 Name,Speaker 1 Company,Speaker 2 Name,Speaker 2 Company,Speaker 3 Name,Speaker 3 Company
+"Keynote: Brian Stevens, SVP and AI CTO, Red Hat",Brian Stevens,Red Hat,,,,
+A Developer’s Guide to Attention in vLLM,Lucas Wilkinson,RedHat,Matthew Bonanni,Red Hat,,
+Scaling PyTorch's Compatibility Promise: A Tiered Cross-Repository CI Relay for Out-of-Tree Backends,Subin George,Red Hat LLC,Jewel K M,Red Hat,,
+State-of-the-Art KV Transfer for Disaggregated LLM Serving in vLLM,Nicolò Lucchesi,Mistral AI,Sunita Nadampalli,Amazon,Zhanqiu Hu,Red Hat
+Sponsored: Making Enterprise Agentic Inference Production-Ready with PyTorch and vLLM,Joseph Groenenboom,Red Hat,Tyler Michael Smith,Red Hat,,
+Gain Geospatial Understanding with the PyTorch Ecosystem,Steven Pousty,Red Hat,,,,
+Sponsored: Quantization Showdown: PyTorch Inference Optimization,Markell Rawls,Red Hat,,,,
+"Contributing to Inference OSS That Won't Stand Still: A BoF on vLLM, llm-d, and the Moving Target",Maroon Ayoub,Red Hat,Nili Guy,IBM,,
+Ecosystem Working Group: Unlocking Community Impact Through the PyTorch Landscape,Joseph Groenenboom,Red Hat,Chris Hoge,NVIDIA,,
+Clearing the Path Towards an ABI Stable PyTorch C++ Extension Ecosystem,Sean McGovern,Red Hat,Chris Leonard,Red Hat,Jane Xu,Meta
+Prefix Caching for Autoregressive Stages in Multi-Stage Pipelines,Ricardo Noriega,Red Hat,Alex Brooks,Red Hat,,

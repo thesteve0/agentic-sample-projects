@@ -1,0 +1,16 @@
+Speaker Name,Company,Talk Titles
+Alex Brooks,Red Hat,Prefix Caching for Autoregressive Stages in Multi-Stage Pipelines
+Brian Stevens,Red Hat,"Keynote: Brian Stevens, SVP and AI CTO, Red Hat"
+Chris Leonard,Red Hat,Clearing the Path Towards an ABI Stable PyTorch C++ Extension Ecosystem
+Jewel K M,Red Hat,Scaling PyTorch's Compatibility Promise: A Tiered Cross-Repository CI Relay for Out-of-Tree Backends
+Joseph Groenenboom,Red Hat,Sponsored: Making Enterprise Agentic Inference Production-Ready with PyTorch and vLLM; Ecosystem Working Group: Unlocking Community Impact Through the PyTorch Landscape
+Lucas Wilkinson,RedHat,A Developer’s Guide to Attention in vLLM
+Markell Rawls,Red Hat,Sponsored: Quantization Showdown: PyTorch Inference Optimization
+Maroon Ayoub,Red Hat,"Contributing to Inference OSS That Won't Stand Still: A BoF on vLLM, llm-d, and the Moving Target"
+Matthew Bonanni,Red Hat,A Developer’s Guide to Attention in vLLM
+Ricardo Noriega,Red Hat,Prefix Caching for Autoregressive Stages in Multi-Stage Pipelines
+Sean McGovern,Red Hat,Clearing the Path Towards an ABI Stable PyTorch C++ Extension Ecosystem
+Steven Pousty,Red Hat,Gain Geospatial Understanding with the PyTorch Ecosystem
+Subin George,Red Hat LLC,Scaling PyTorch's Compatibility Promise: A Tiered Cross-Repository CI Relay for Out-of-Tree Backends
+Tyler Michael Smith,Red Hat,Sponsored: Making Enterprise Agentic Inference Production-Ready with PyTorch and vLLM
+Zhanqiu Hu,Red Hat,State-of-the-Art KV Transfer for Disaggregated LLM Serving in vLLM

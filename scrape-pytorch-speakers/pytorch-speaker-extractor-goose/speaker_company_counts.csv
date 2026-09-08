@@ -1,25 +1,27 @@
 Company,Count
-Meta,29
-NVIDIA,9
-Red Hat,6
+Meta,30
+NVIDIA,10
+Red Hat,8
+IBM,6
+Intel,6
 AMD,5
+Amazon Web Services,5
+Google,5
 Hugging Face,5
-IBM,5
+Arm,4
 Huawei,4
-Intel,4
-Amazon Web Services,3
-Google,3
-Anyscale,2
-Arm,2
 IBM Research,2
-Intel Corporation,2
 Lightning AI,2
 Meta Platform Inc.,2
 Pinterest,2
+PyTorch Foundation,2
 RadixArk,2
 AWS Annapurna Labs,1
+Adaption,1
+Agentic AI Foundation,1
 Amazon.com,1
 Annapurna Labs,1
+Anyscale,1
 Apple,1
 Argonne National Laboratory,1
 Beijing Academy of Artificial Intelligence,1
@@ -27,19 +29,27 @@ Bird of Paradise AI,1
 BosonAI,1
 ByteDance,1
 Capital One,1
+Cohere,1
+Core Automation,1
+Crusoe,1
+Crusoe AI,1
 Dell,1
 Everpure,1
 Fujitsu Research of India Private Limited,1
+Google Cloud,1
 Google Inc,1
-HuggingFace,1
+Inferact,1
 Lemurian Labs,1
 LinkedIn,1
 MathWorks,1
 Meta Platforms,1
+Meta PyTorch,1
 "Meta, PyTorch Distributed",1
 Mistral AI,1
+Modal,1
 Modular,1
 NVIDIA Corporation,1
+Qualcomm,1
 Rebellions,1
 Red Hat LLC,1
 RedHat,1

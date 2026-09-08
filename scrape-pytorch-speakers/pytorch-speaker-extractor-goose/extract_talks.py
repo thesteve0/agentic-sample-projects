@@ -45,6 +45,13 @@ OUTPUT_CSV = Path("talks_and_speakers.csv")
 # Output file for company-speaker-count aggregation
 COMPANY_COUNT_CSV = Path("speaker_company_counts.csv")
 
+# Red Hat output files
+REDHAT_TALKS_CSV = Path("redhat_talks_and_speakers.csv")
+REDHAT_SPEAKERS_CSV = Path("redhat_speakers_list.csv")
+
+# Known Red Hat company names (exact match, case-sensitive after lowercasing)
+REDHAT_COMPANY_VARIANTS = {"red hat", "red hat llc", "redhat"}
+
 # The question ID used for speaker company information in Sessionize.
 # This ID is conference-specific and found in the API's "questions" list.
 SPEAKER_COMPANY_QUESTION_ID = 128058
@@ -330,6 +337,131 @@ def print_statistics(talks: List[Talk]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Red Hat filtering
+# ---------------------------------------------------------------------------
+
+def is_red_hat_company(company: str) -> bool:
+    """Check if a company name is a known Red Hat variant.
+
+    Matches case-insensitively against known variants:
+      - "Red Hat"
+      - "RedHat"
+      - "Red Hat LLC"
+
+    Args:
+        company: The company name string from the speaker data.
+
+    Returns:
+        True if the company matches a Red Hat variant.
+    """
+    return company.lower() in REDHAT_COMPANY_VARIANTS
+
+
+def filter_redhat_talks(talks: List[Talk]) -> List[Talk]:
+    """Filter talks to only those with at least one Red Hat speaker.
+
+    Checks all speakers up to the maximum of 3 per talk.
+
+    Args:
+        talks: List of all Talk objects.
+
+    Returns:
+        A list of Talk objects where at least one speaker's company
+        matches a Red Hat variant.
+    """
+    redhat_talks = []
+    for talk in talks:
+        for speaker in talk.speakers[:3]:  # max 3 speakers per talk
+            if is_red_hat_company(speaker.company):
+                redhat_talks.append(talk)
+                break
+    return redhat_talks
+
+
+def write_redhat_talks_to_csv(
+    redhat_talks: List[Talk], output_path: Path
+) -> None:
+    """Write Red Hat talks and speakers to a CSV file.
+
+    The CSV has:
+        - Column 1: Talk Title
+        - Column 2: Speaker 1 Name
+        - Column 3: Speaker 1 Company
+        - Column 4: Speaker 2 Name
+        - Column 5: Speaker 2 Company
+        - Column 6: Speaker 3 Name
+        - Column 7: Speaker 3 Company
+
+    Only talks with at least one Red Hat speaker are included.
+
+    Args:
+        redhat_talks: List of Talk objects filtered to Red Hat speakers.
+        output_path: Path to the output CSV file.
+    """
+    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([
+            "Talk Title",
+            "Speaker 1 Name", "Speaker 1 Company",
+            "Speaker 2 Name", "Speaker 2 Company",
+            "Speaker 3 Name", "Speaker 3 Company",
+        ])
+
+        for talk in redhat_talks:
+            row = [talk.title]
+            for speaker in talk.speakers[:3]:  # max 3
+                row.append(speaker.name)
+                row.append(speaker.company)
+            # Pad if fewer than 3 speakers
+            for _ in range((3 - len(talk.speakers)) * 2):
+                row.append("")
+            writer.writerow(row)
+
+    print(f"Wrote {len(redhat_talks)} Red Hat talks to '{output_path}'")
+
+
+def write_redhat_speakers_to_csv(
+    redhat_talks: List[Talk], output_path: Path
+) -> None:
+    """Write a deduplicated list of Red Hat speakers to a CSV file.
+
+    The CSV has:
+        - Column 1: Speaker Name
+        - Column 2: Company
+        - Column 3: Talk Titles (semicolon-separated)
+
+    Args:
+        redhat_talks: List of Talk objects with Red Hat speakers.
+        output_path: Path to the output CSV file.
+    """
+    # Build a mapping: speaker_name -> {company, talk_titles}
+    speaker_map: Dict[str, Dict] = {}
+    for talk in redhat_talks:
+        for speaker in talk.speakers[:3]:
+            if is_red_hat_company(speaker.company):
+                name = speaker.name
+                if name not in speaker_map:
+                    speaker_map[name] = {
+                        "company": speaker.company,
+                        "talks": [],
+                    }
+                speaker_map[name]["talks"].append(talk.title)
+
+    # Sort by speaker name
+    sorted_speakers = sorted(speaker_map.items(), key=lambda x: x[0])
+
+    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Speaker Name", "Company", "Talk Titles"])
+
+        for name, info in sorted_speakers:
+            talks_str = "; ".join(info["talks"])
+            writer.writerow([name, info["company"], talks_str])
+
+    print(f"Wrote {len(sorted_speakers)} Red Hat speakers to '{output_path}'")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -363,6 +495,12 @@ def main() -> None:
     # Step 5: Compute and write company speaker counts
     company_counts = compute_company_counts(talks)
     write_company_counts_to_csv(company_counts, COMPANY_COUNT_CSV)
+
+    # Step 5b: Filter and write Red Hat talks/speakers
+    redhat_talks = filter_redhat_talks(talks)
+    write_redhat_talks_to_csv(redhat_talks, REDHAT_TALKS_CSV)
+    write_redhat_speakers_to_csv(redhat_talks, REDHAT_SPEAKERS_CSV)
+    print(f"Found {len(redhat_talks)} talks with Red Hat speakers ({len(redhat_talks) / len(talks) * 100:.1f}% of total)")
 
     # Step 6: Print summary statistics
     print_statistics(talks)
